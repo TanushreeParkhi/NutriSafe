@@ -1,0 +1,22 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/dashboardFragment"
+        android:icon="@android:drawable/ic_menu_view"
+        android:title="@string/nav_dashboard" />
+    <item
+        android:id="@+id/mealLogFragment"
+        android:icon="@android:drawable/ic_menu_camera"
+        android:title="@string/nav_meals" />
+    <item
+        android:id="@+id/insightsFragment"
+        android:icon="@android:drawable/ic_menu_sort_by_size"
+        android:title="@string/nav_insights" />
+    <item
+        android:id="@+id/privacyVaultFragment"
+        android:icon="@android:drawable/ic_lock_lock"
+        android:title="@string/nav_privacy" />
+    <item
+        android:id="@+id/aiChatFragment"
+        android:icon="@android:drawable/ic_menu_send"
+        android:title="@string/nav_chat" />
+</menu>

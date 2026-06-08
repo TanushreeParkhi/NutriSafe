@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">PrivEat</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_meals">Meals</string>
+    <string name="nav_insights">Insights</string>
+    <string name="nav_privacy">Privacy</string>
+    <string name="nav_chat">AI Chat</string>
+    <string name="unlock">Unlock</string>
+    <string name="use_biometric">Use Biometric</string>
+    <string name="water_glasses">Water Glasses</string>
+    <string name="capture_meal">Capture Meal</string>
+    <string name="scan_prescription">Scan Prescription</string>
+    <string name="add_condition">Add Condition</string>
+    <string name="send">Send</string>
+    <string name="privacy_lock">Privacy Lock</string>
+    <string name="privacy_blur">Privacy Blur</string>
+    <string name="diet_preference">Diet Preference</string>
+    <string name="medical_ledger">Medical Ledger</string>
+    <string name="expert_chat">Expert Chat</string>
+    <string name="ai_dietician">AI Dietician</string>
+    <string name="daily_target">Daily target 2200 kcal</string>
+</resources>

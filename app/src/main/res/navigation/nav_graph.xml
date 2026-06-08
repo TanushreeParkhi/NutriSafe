@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/dashboardFragment">
+
+    <fragment
+        android:id="@+id/dashboardFragment"
+        android:name="com.priveat.app.ui.dashboard.DashboardFragment"
+        android:label="@string/nav_dashboard" />
+    <fragment
+        android:id="@+id/mealLogFragment"
+        android:name="com.priveat.app.ui.meal.MealLogFragment"
+        android:label="@string/nav_meals" />
+    <fragment
+        android:id="@+id/insightsFragment"
+        android:name="com.priveat.app.ui.insights.InsightsFragment"
+        android:label="@string/nav_insights" />
+    <fragment
+        android:id="@+id/privacyVaultFragment"
+        android:name="com.priveat.app.ui.privacy.PrivacyVaultFragment"
+        android:label="@string/nav_privacy" />
+    <fragment
+        android:id="@+id/aiChatFragment"
+        android:name="com.priveat.app.ui.chat.AIChatFragment"
+        android:label="@string/nav_chat" />
+</navigation>
