@@ -1,0 +1,27 @@
+# Gradle / Android
+.gradle/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.ap_
+*.aab
+*.aar
+
+# Local machine config
+local.properties
+**/local.properties
+.idea/
+*.iml
+
+# Secrets and crash artifacts
+*.keystore
+*.jks
+*.hprof
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

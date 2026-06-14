@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="camera_meals" path="camera_meals/" />
+    <files-path name="meal_captures" path="meal_captures/" />
+</paths>
