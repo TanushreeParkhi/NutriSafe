@@ -1,12 +1,11 @@
-﻿package com.priveat.app.data.repository
+package com.priveat.app.data.repository
 
 import com.priveat.app.BuildConfig
 import com.priveat.app.data.model.MealEntity
 import com.priveat.app.data.preferences.UserPreferences
-import com.priveat.app.data.remote.GeminiApi
-import com.priveat.app.data.remote.GeminiContent
-import com.priveat.app.data.remote.GeminiPart
-import com.priveat.app.data.remote.GeminiRequest
+import com.priveat.app.data.remote.AiProxyApi
+import com.priveat.app.data.remote.AiProxyRequest
+import com.priveat.app.data.remote.AiTasks
 import com.priveat.app.data.remote.PromptTemplates
 import com.priveat.app.domain.FoodFacts
 import com.priveat.app.domain.PrescriptionExtract
@@ -23,40 +22,51 @@ class GeminiRepository {
     var lastError: String? = null
         private set
 
-    private val api: GeminiApi by lazy {
-        val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
-        val client = OkHttpClient.Builder()
+    private val api: AiProxyApi by lazy {
+        val clientBuilder = OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(45, TimeUnit.SECONDS)
-            .addInterceptor(logging)
-            .build()
+
+        if (BuildConfig.DEBUG) {
+            val logging = HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            }
+            clientBuilder.addInterceptor(logging)
+        }
 
         Retrofit.Builder()
-            .baseUrl("https://generativelanguage.googleapis.com/")
-            .client(client)
+            .baseUrl(BuildConfig.PRIVEAT_BACKEND_BASE_URL.ensureTrailingSlash())
+            .client(clientBuilder.build())
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-            .create(GeminiApi::class.java)
+            .create(AiProxyApi::class.java)
     }
 
     suspend fun analyzeFoodImage(imageUri: String?, storage: StorageUserInput): FoodFacts {
         val storageContext = "food=${storage.foodType}, outsideHours=${storage.timeOutsideHours}, refrigerated=${storage.refrigerated}, source=${storage.sourceType}, tempC=${storage.storageTemperatureC}, imageUri=$imageUri"
         val prompt = PromptTemplates.foodAnalysisPrompt(storageContext)
-        return requestJson(prompt)?.let(::parseFoodFacts) ?: mockFoodFacts()
+        return requestJson(AiTasks.FoodAnalysis, BuildConfig.GEMINI_FLASH_MODEL, prompt)
+            ?.let(::parseFoodFacts)
+            ?: mockFoodFacts(storage)
     }
 
     suspend fun importPrescription(): PrescriptionExtract {
-        return requestJson(PromptTemplates.prescriptionOcrPrompt())?.let(::parsePrescription)
+        return requestJson(
+            task = AiTasks.PrescriptionOcr,
+            preferredModel = BuildConfig.GEMINI_FLASH_MODEL,
+            prompt = PromptTemplates.prescriptionOcrPrompt()
+        )?.let(::parsePrescription)
             ?: PrescriptionExtract(
                 conditions = listOf("Diabetes", "Acidity"),
                 allergies = listOf("peanut"),
-                notes = "Mock import added common constraints for demo. Replace with real OCR through a backend proxy."
+                notes = "Cloud OCR is unavailable. Local fallback added common demo constraints."
             )
     }
 
     suspend fun generateDietPlan(goal: String, meals: List<MealEntity>, preferences: UserPreferences): String {
         val prompt = PromptTemplates.dietPlanPrompt(goal, meals, preferences)
-        val responseText = requestText(prompt) ?: return mockDietPlan(goal, meals, preferences)
+        val responseText = requestText(AiTasks.DietPlan, BuildConfig.GEMINI_PRO_MODEL, prompt)
+            ?: return mockDietPlan(goal, meals, preferences)
         val clean = cleanJson(responseText)
         val jsonPlan = runCatching {
             val json = JSONObject(clean)
@@ -87,7 +97,8 @@ class GeminiRepository {
 
     suspend fun chatReply(dietitianName: String, question: String, meals: List<MealEntity>): String {
         val prompt = PromptTemplates.chatPrompt(dietitianName, question, meals)
-        val responseText = requestText(prompt) ?: return mockChatReply(question, meals)
+        val responseText = requestText(AiTasks.ExpertChat, BuildConfig.GEMINI_FLASH_MODEL, prompt)
+            ?: return mockChatReply(question, meals)
         val clean = cleanJson(responseText)
         return runCatching { JSONObject(clean).optString("reply") }.getOrNull()
             ?.takeIf { it.isNotBlank() }
@@ -95,40 +106,39 @@ class GeminiRepository {
             ?: mockChatReply(question, meals)
     }
 
-    private suspend fun requestJson(prompt: String): JSONObject? {
-        return requestText(prompt)?.let { text ->
+    private suspend fun requestJson(task: String, preferredModel: String, prompt: String): JSONObject? {
+        return requestText(task, preferredModel, prompt)?.let { text ->
             runCatching { JSONObject(cleanJson(text)) }.getOrNull()
         }
     }
 
-    private suspend fun requestText(prompt: String): String? {
-        val apiKey = BuildConfig.GEMINI_API_KEY
+    private suspend fun requestText(task: String, preferredModel: String, prompt: String): String? {
         lastError = null
-        if (apiKey.isBlank()) {
-            lastError = "Gemini API key is missing."
+        if (!BuildConfig.CLOUD_AI_ENABLED) {
+            lastError = "Cloud AI is disabled; using local PrivEat safety rules."
+            return null
+        }
+        if (BuildConfig.PRIVEAT_BACKEND_BASE_URL.isBlank()) {
+            lastError = "PrivEat backend URL is missing; using local fallback."
             return null
         }
 
-        // TODO: production must call backend proxy. Do not ship direct client API-key calls.
         return runCatching {
             val response = api.generate(
-                model = BuildConfig.GEMINI_MODEL,
-                apiKey = apiKey,
-                request = GeminiRequest(contents = listOf(GeminiContent(listOf(GeminiPart(prompt)))))
+                AiProxyRequest(
+                    task = task,
+                    preferredModel = preferredModel,
+                    prompt = prompt
+                )
             )
-            val text = response.candidates.firstOrNull()
-                ?.content
-                ?.parts
-                ?.firstOrNull()
-                ?.text
-                .orEmpty()
-            text.takeIf { it.isNotBlank() }
+            response.json?.takeIf { it.isNotBlank() }
+                ?: response.text?.takeIf { it.isNotBlank() }
         }.onFailure { throwable ->
             lastError = if (throwable is HttpException) {
                 val body = throwable.response()?.errorBody()?.string()?.take(220).orEmpty()
-                "Gemini HTTP ${throwable.code()}: ${body.ifBlank { throwable.message() }}"
+                "PrivEat AI proxy HTTP ${throwable.code()}: ${body.ifBlank { throwable.message() }}"
             } else {
-                "Gemini request failed: ${throwable.message ?: throwable::class.java.simpleName}"
+                "PrivEat AI proxy failed: ${throwable.message ?: throwable::class.java.simpleName}"
             }
         }.getOrNull()
     }
@@ -180,25 +190,31 @@ class GeminiRepository {
         .removeSuffix("```")
         .trim()
 
-    private fun mockFoodFacts() = FoodFacts(
-        name = "Sri Lankan Rice And Curry Plate",
-        calories = 680,
-        proteinGrams = 19f,
-        carbsGrams = 110f,
-        fatGrams = 20f,
-        ingredients = listOf("white rice", "dhal", "vegetables", "coconut sambol", "papadam"),
+    private fun String.ensureTrailingSlash(): String = if (endsWith("/")) this else "$this/"
+
+    private fun mockFoodFacts(storage: StorageUserInput) = FoodFacts(
+        name = if (storage.foodType.isBlank()) "Logged Meal" else storage.foodType,
+        calories = 420,
+        proteinGrams = 18f,
+        carbsGrams = 55f,
+        fatGrams = 14f,
+        ingredients = listOf("estimated meal ingredients"),
         additives = emptyList(),
-        freshnessStatus = "Fresh",
-        freshnessNotes = "Freshly prepared; vegetables appear vibrant and moist, likely within 2-4 hours of cooking.",
-        shelfLifeHours = 6,
+        freshnessStatus = if (storage.timeOutsideHours >= 8) "Possibly spoiled" else "Fresh",
+        freshnessNotes = if (storage.timeOutsideHours >= 8) {
+            "Stored outside for ${storage.timeOutsideHours} hours. PrivEat local rules recommend checking smell, texture, and temperature before eating."
+        } else {
+            "Local estimate only. No cloud image analysis was used."
+        },
+        shelfLifeHours = if (storage.refrigerated) 24 else 6,
         processedClassification = "minimally processed",
-        moistureLevel = "high",
+        moistureLevel = "medium",
         containsDairy = false,
         containsMeat = false,
         cooked = true,
         raw = false,
-        spicy = true,
-        fried = true,
+        spicy = false,
+        fried = false,
         sodiumLevel = "medium",
         sugarLevel = "low"
     )
@@ -216,25 +232,26 @@ class GeminiRepository {
             Based on $lastMeal and your ${preferences.dietVault} vault, keep rice portions moderate and add a stronger protein anchor at lunch.
 
             Suggested day
-            - Breakfast: Greek yogurt or curd bowl with fruit and seeds.
-            - Lunch: Rice and curry plate with extra dal, vegetables, and less fried papadam.
+            - Breakfast: Curd bowl or dal chilla with fruit.
+            - Lunch: Traditional plate with extra dal, vegetables, and less fried sides.
             - Snack: Roasted chana or fruit with nuts.
-            - Dinner: Vegetable soup plus paneer/tofu/egg/fish depending on your vault.
+            - Dinner: Vegetable soup plus paneer, tofu, egg, or fish depending on your vault.
 
             Safety notes
             - Refrigerate cooked leftovers within 2 hours.
             - Reheat rice until steaming before eating.
+            - Avoid leftovers with sour smell, slimy texture, or unknown storage time.
         """.trimIndent()
     }
 
     private fun mockChatReply(question: String, meals: List<MealEntity>): String {
         val lastMeal = meals.firstOrNull()?.name ?: "your recent logs"
         return if (question.contains("greet", ignoreCase = true) || question.contains("start a private", ignoreCase = true)) {
-            "Hello, I'm your private PrivEat AI dietitian. I can help with meals, allergies, disease suitability, and safety decisions using only your local history."
+            "Hello, I'm your private PrivEat AI dietitian. Cloud AI is currently optional, so I can still help with local meal safety, allergens, freshness, and storage decisions."
         } else if (question.contains("weight", ignoreCase = true)) {
-            "Reducing weight works best with a steady calorie deficit, but meal composition matters too. Looking at $lastMeal, start by improving protein at each meal, reducing fried sides, and keeping rice to a measured portion. Keep water above 2 liters and log dinner so PrivEat can spot low-protein days."
+            "Reducing weight works best with a steady calorie deficit, but food safety still matters. Looking at $lastMeal, improve protein at each meal, reduce fried sides, and avoid leftovers with long room-temperature storage."
         } else {
-            "I reviewed $lastMeal and your local logs. Keep meals fresh, refrigerate leftovers quickly, and aim for protein plus fiber at each meal. Share one specific meal goal and I can help adjust it privately."
+            "I reviewed $lastMeal and your local logs. Keep meals fresh, refrigerate leftovers quickly, and treat high-moisture cooked foods as time-sensitive. Share one specific meal and I can help assess storage and suitability."
         }
     }
 }

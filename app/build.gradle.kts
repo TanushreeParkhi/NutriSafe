@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
@@ -12,14 +12,38 @@ android {
         applicationId = "com.priveat.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        val geminiApiKey = providers.gradleProperty("GEMINI_API_KEY").orElse("").get()
-        val geminiModel = providers.gradleProperty("GEMINI_MODEL").orElse("gemini-3.5-flash").get()
-        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
-        buildConfigField("String", "GEMINI_MODEL", "\"$geminiModel\"")
+        fun String.asBuildConfigString() = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+        val backendBaseUrl = providers.gradleProperty("PRIVEAT_BACKEND_BASE_URL").orElse("").get()
+        val cloudAiEnabled = providers.gradleProperty("PRIVEAT_CLOUD_AI_ENABLED").orElse("false").get()
+        val geminiFlashModel = providers.gradleProperty("GEMINI_FLASH_MODEL").orElse("gemini-3-flash-preview").get()
+        val geminiProModel = providers.gradleProperty("GEMINI_PRO_MODEL").orElse("gemini-3.1-pro-preview").get()
+
+        buildConfigField("String", "PRIVEAT_BACKEND_BASE_URL", backendBaseUrl.asBuildConfigString())
+        buildConfigField("Boolean", "CLOUD_AI_ENABLED", cloudAiEnabled.toBooleanStrictOrNull()?.toString() ?: "false")
+        buildConfigField("String", "GEMINI_FLASH_MODEL", geminiFlashModel.asBuildConfigString())
+        buildConfigField("String", "GEMINI_PRO_MODEL", geminiProModel.asBuildConfigString())
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+
+        release {
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
     }
 
     buildFeatures {
@@ -85,4 +109,3 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }
-

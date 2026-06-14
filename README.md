@@ -14,18 +14,24 @@ Default local demo login:
 - Email: `admin@priveat.com`
 - Password: `password123`
 
-## Gemini Setup
+## Production AI Setup
 
-The app works without a Gemini key by using `GeminiRepository` mock fallback responses.
+PrivEat is production-configured so Gemini keys never live in the Android app.
+Cloud AI is optional and disabled by default; local safety rules keep the app usable offline.
 
-For a demo key, set this Gradle property before syncing:
+For production, deploy a backend proxy and set:
 
 ```properties
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-1.5-flash
+PRIVEAT_BACKEND_BASE_URL=https://api.yourdomain.com/
+PRIVEAT_CLOUD_AI_ENABLED=true
+GEMINI_FLASH_MODEL=gemini-3-flash-preview
+GEMINI_PRO_MODEL=gemini-3.1-pro-preview
 ```
 
-The API key is read through `BuildConfig` and isolated inside `GeminiRepository`. The source includes the required TODO: production must call a backend proxy. Do not ship production Android clients with a direct Gemini API key.
+The backend stores `GEMINI_API_KEY`, applies per-user quotas, calls Gemini, and returns strict JSON to the app.
+Do not ship production Android clients with a direct Gemini API key.
+
+See `docs/PRODUCTION_READINESS.md` for the backend contract and release checklist.
 
 ## Privacy Model
 
@@ -48,8 +54,8 @@ The API key is read through `BuildConfig` and isolated inside `GeminiRepository`
 
 ## Biosafety/Nutrition Features
 
-- Hybrid Gemini extraction plus deterministic Kotlin rule engine
-- Food recognition mock/Gemini service layer for calories and macros
+- Hybrid backend Gemini extraction plus deterministic Kotlin rule engine
+- Food recognition fallback/backend service layer for calories and macros
 - Freshness/spoilage risk categories
 - Improper storage detection from user inputs
 - Microbial growth estimator
