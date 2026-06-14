@@ -6,6 +6,7 @@ PrivEat should remain local-first and food-safety-first. Cloud AI is an optional
 
 - Never place `GEMINI_API_KEY` or other provider keys in the Android project.
 - Keep `PRIVEAT_CLOUD_AI_ENABLED=false` until a backend proxy is deployed.
+- Keep `PRIVEAT_BACKEND_AUTH_ENABLED=false` until backend auth is deployed.
 - Keep all food safety, allergen, disease suitability, and leftover risk rules working locally.
 - Use HTTPS only. Cleartext traffic is disabled in the Android manifest.
 - Keep app backups disabled for Room, DataStore, app files, and external app files.
@@ -17,6 +18,8 @@ The Android app sends task requests to your backend:
 
 ```text
 POST /v1/ai/generate
+POST /v1/ai/analyze-meal-image
+POST /v1/ai/import-prescription
 ```
 
 Request:
@@ -58,6 +61,15 @@ Task routing:
 - Redact sensitive fields from logs.
 - Return strict JSON for scanner and prescription tasks.
 - Return safe local fallback messages when Gemini quota is exhausted.
+
+The repository includes a FastAPI backend scaffold in `backend/` with:
+
+- Email/password registration and login.
+- Argon2 password hashing.
+- JWT bearer tokens.
+- Account deletion.
+- Per-user Gemini task quotas.
+- Text, meal-image, and prescription-upload proxy endpoints.
 
 ## App Store Release Checklist
 

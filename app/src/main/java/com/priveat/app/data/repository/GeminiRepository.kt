@@ -1,8 +1,11 @@
 package com.priveat.app.data.repository
 
+import android.content.Context
+import android.net.Uri
 import com.priveat.app.BuildConfig
 import com.priveat.app.data.model.MealEntity
 import com.priveat.app.data.preferences.UserPreferences
+import com.priveat.app.data.preferences.UserPreferencesRepository
 import com.priveat.app.data.remote.AiProxyApi
 import com.priveat.app.data.remote.AiProxyRequest
 import com.priveat.app.data.remote.AiTasks
@@ -10,15 +13,22 @@ import com.priveat.app.data.remote.PromptTemplates
 import com.priveat.app.domain.FoodFacts
 import com.priveat.app.domain.PrescriptionExtract
 import com.priveat.app.domain.StorageUserInput
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
-class GeminiRepository {
+class GeminiRepository(
+    private val context: Context,
+    private val preferencesRepository: UserPreferencesRepository
+) {
     var lastError: String? = null
         private set
 
@@ -45,17 +55,24 @@ class GeminiRepository {
     suspend fun analyzeFoodImage(imageUri: String?, storage: StorageUserInput): FoodFacts {
         val storageContext = "food=${storage.foodType}, outsideHours=${storage.timeOutsideHours}, refrigerated=${storage.refrigerated}, source=${storage.sourceType}, tempC=${storage.storageTemperatureC}, imageUri=$imageUri"
         val prompt = PromptTemplates.foodAnalysisPrompt(storageContext)
-        return requestJson(AiTasks.FoodAnalysis, BuildConfig.GEMINI_FLASH_MODEL, prompt)
-            ?.let(::parseFoodFacts)
-            ?: mockFoodFacts(storage)
+        val cloudJson = if (imageUri.isNullOrBlank()) {
+            requestJson(AiTasks.FoodAnalysis, BuildConfig.GEMINI_FLASH_MODEL, prompt)
+        } else {
+            requestImageAnalysis(imageUri, storageContext, prompt)
+        }
+
+        return cloudJson?.let(::parseFoodFacts) ?: mockFoodFacts(storage)
     }
 
-    suspend fun importPrescription(): PrescriptionExtract {
-        return requestJson(
-            task = AiTasks.PrescriptionOcr,
-            preferredModel = BuildConfig.GEMINI_FLASH_MODEL,
-            prompt = PromptTemplates.prescriptionOcrPrompt()
-        )?.let(::parsePrescription)
+    suspend fun importPrescription(documentUri: Uri? = null): PrescriptionExtract {
+        val prompt = PromptTemplates.prescriptionOcrPrompt()
+        val cloudJson = if (documentUri == null) {
+            requestJson(AiTasks.PrescriptionOcr, BuildConfig.GEMINI_FLASH_MODEL, prompt)
+        } else {
+            requestDocumentOcr(documentUri, prompt)
+        }
+
+        return cloudJson?.let(::parsePrescription)
             ?: PrescriptionExtract(
                 conditions = listOf("Diabetes", "Acidity"),
                 allergies = listOf("peanut"),
@@ -114,17 +131,11 @@ class GeminiRepository {
 
     private suspend fun requestText(task: String, preferredModel: String, prompt: String): String? {
         lastError = null
-        if (!BuildConfig.CLOUD_AI_ENABLED) {
-            lastError = "Cloud AI is disabled; using local PrivEat safety rules."
-            return null
-        }
-        if (BuildConfig.PRIVEAT_BACKEND_BASE_URL.isBlank()) {
-            lastError = "PrivEat backend URL is missing; using local fallback."
-            return null
-        }
+        if (!cloudReady()) return null
 
         return runCatching {
             val response = api.generate(
+                bearerToken(),
                 AiProxyRequest(
                     task = task,
                     preferredModel = preferredModel,
@@ -134,13 +145,85 @@ class GeminiRepository {
             response.json?.takeIf { it.isNotBlank() }
                 ?: response.text?.takeIf { it.isNotBlank() }
         }.onFailure { throwable ->
-            lastError = if (throwable is HttpException) {
-                val body = throwable.response()?.errorBody()?.string()?.take(220).orEmpty()
-                "PrivEat AI proxy HTTP ${throwable.code()}: ${body.ifBlank { throwable.message() }}"
-            } else {
-                "PrivEat AI proxy failed: ${throwable.message ?: throwable::class.java.simpleName}"
-            }
+            lastError = proxyFailureMessage(throwable)
         }.getOrNull()
+    }
+
+    private suspend fun requestImageAnalysis(
+        imageUri: String,
+        storageContext: String,
+        prompt: String
+    ): JSONObject? {
+        lastError = null
+        if (!cloudReady()) return null
+
+        return runCatching {
+            val response = api.analyzeMealImage(
+                bearerToken = bearerToken(),
+                image = uriPart(Uri.parse(imageUri), "image"),
+                storageContext = storageContext.formBody(),
+                preferredModel = BuildConfig.GEMINI_FLASH_MODEL.formBody(),
+                prompt = prompt.formBody()
+            )
+            response.json?.takeIf { it.isNotBlank() }
+                ?: response.text?.takeIf { it.isNotBlank() }
+        }.onFailure { throwable ->
+            lastError = proxyFailureMessage(throwable)
+        }.getOrNull()?.let { runCatching { JSONObject(cleanJson(it)) }.getOrNull() }
+    }
+
+    private suspend fun requestDocumentOcr(documentUri: Uri, prompt: String): JSONObject? {
+        lastError = null
+        if (!cloudReady()) return null
+
+        return runCatching {
+            val response = api.importPrescription(
+                bearerToken = bearerToken(),
+                document = uriPart(documentUri, "document"),
+                preferredModel = BuildConfig.GEMINI_FLASH_MODEL.formBody(),
+                prompt = prompt.formBody()
+            )
+            response.json?.takeIf { it.isNotBlank() }
+                ?: response.text?.takeIf { it.isNotBlank() }
+        }.onFailure { throwable ->
+            lastError = proxyFailureMessage(throwable)
+        }.getOrNull()?.let { runCatching { JSONObject(cleanJson(it)) }.getOrNull() }
+    }
+
+    private fun cloudReady(): Boolean {
+        if (!BuildConfig.CLOUD_AI_ENABLED) {
+            lastError = "Cloud AI is disabled; using local PrivEat safety rules."
+            return false
+        }
+        if (BuildConfig.PRIVEAT_BACKEND_BASE_URL.isBlank()) {
+            lastError = "PrivEat backend URL is missing; using local fallback."
+            return false
+        }
+        return true
+    }
+
+    private fun uriPart(uri: Uri, fieldName: String): MultipartBody.Part {
+        val resolver = context.contentResolver
+        val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+        val bytes = resolver.openInputStream(uri)?.use { input -> input.readBytes() }
+            ?: error("Could not read selected file.")
+        require(bytes.size <= 8 * 1024 * 1024) { "File is larger than 8 MB." }
+        val body = bytes.toRequestBody(mimeType.toMediaType())
+        return MultipartBody.Part.createFormData(fieldName, "priveat_upload", body)
+    }
+
+    private fun proxyFailureMessage(throwable: Throwable): String {
+        return if (throwable is HttpException) {
+            val body = throwable.response()?.errorBody()?.string()?.take(220).orEmpty()
+            "PrivEat AI proxy HTTP ${throwable.code()}: ${body.ifBlank { throwable.message() }}"
+        } else {
+            "PrivEat AI proxy failed: ${throwable.message ?: throwable::class.java.simpleName}"
+        }
+    }
+
+    private suspend fun bearerToken(): String {
+        val token = preferencesRepository.session.first().authToken
+        return if (token.isBlank()) "" else "Bearer $token"
     }
 
     private fun parseFoodFacts(json: JSONObject): FoodFacts {
@@ -191,6 +274,8 @@ class GeminiRepository {
         .trim()
 
     private fun String.ensureTrailingSlash(): String = if (endsWith("/")) this else "$this/"
+
+    private fun String.formBody() = toRequestBody("text/plain".toMediaType())
 
     private fun mockFoodFacts(storage: StorageUserInput) = FoodFacts(
         name = if (storage.foodType.isBlank()) "Logged Meal" else storage.foodType,

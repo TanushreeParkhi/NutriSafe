@@ -91,14 +91,26 @@ class PrivEatViewModel(application: Application) : AndroidViewModel(application)
     fun signIn(email: String, password: String) {
         viewModelScope.launch {
             authError = null
-            val success = container.authRepository.signIn(email, password)
-            if (!success) authError = "Invalid credentials. Hint: admin@priveat.com / password123"
+            val result = container.authRepository.signIn(email, password)
+            if (!result.success) authError = result.message
+        }
+    }
+
+    fun signUp(email: String, password: String) {
+        viewModelScope.launch {
+            authError = null
+            val result = container.authRepository.signUp(email, password)
+            if (!result.success) {
+                authError = result.message
+            } else if (result.message.isNotBlank()) {
+                notice = result.message
+            }
         }
     }
 
     fun signOut() {
         viewModelScope.launch {
-            container.authRepository.signOut(session.value.email)
+            container.authRepository.signOut(session.value)
         }
     }
 
@@ -165,7 +177,7 @@ class PrivEatViewModel(application: Application) : AndroidViewModel(application)
                         )
                     }
                 }
-                val extract = container.geminiRepository.importPrescription()
+                val extract = container.geminiRepository.importPrescription(documentUri)
                 extract.conditions.forEach { container.healthRepository.addCondition(it, extract.notes) }
                 extract.allergies.forEach { container.healthRepository.addAllergy(it, extract.notes) }
                 notice = if (documentUri == null) {
@@ -290,10 +302,14 @@ class PrivEatViewModel(application: Application) : AndroidViewModel(application)
 
     fun wipeVaultAndLogout() {
         viewModelScope.launch {
+            val remoteDelete = container.authRepository.deleteRemoteAccount(session.value)
+            if (!remoteDelete.success) {
+                notice = remoteDelete.message
+                return@launch
+            }
             container.wipeAllLocalData()
             weeklyReport = WeeklyFoodRiskReport()
             generatedPlan = ""
-            container.authRepository.signOut(session.value.email)
         }
     }
 

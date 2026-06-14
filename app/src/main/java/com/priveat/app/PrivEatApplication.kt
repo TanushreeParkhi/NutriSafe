@@ -10,7 +10,9 @@ import com.priveat.app.data.repository.ExpertChatRepository
 import com.priveat.app.data.repository.GeminiRepository
 import com.priveat.app.data.repository.HealthRepository
 import com.priveat.app.data.repository.MealRepository
+import com.priveat.app.data.security.DatabaseKeyProvider
 import com.priveat.app.domain.SafetyRuleEngine
+import net.sqlcipher.database.SupportFactory
 
 class PrivEatApplication : Application() {
     lateinit var container: AppContainer
@@ -27,15 +29,16 @@ class AppContainer(context: Context) {
     private val database = Room.databaseBuilder(
         appContext,
         PrivEatDatabase::class.java,
-        "priveat_local.db"
+        "priveat_secure.db"
     )
+        .openHelperFactory(SupportFactory(DatabaseKeyProvider.databasePassphrase(appContext)))
         .fallbackToDestructiveMigration()
         .build()
 
     val preferencesRepository = UserPreferencesRepository(appContext)
     val authRepository = AuthRepository(preferencesRepository)
     val safetyRuleEngine = SafetyRuleEngine()
-    val geminiRepository = GeminiRepository()
+    val geminiRepository = GeminiRepository(appContext, preferencesRepository)
     val mealRepository = MealRepository(
         appContext,
         database.mealDao(),

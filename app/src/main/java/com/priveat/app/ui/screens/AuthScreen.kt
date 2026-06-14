@@ -124,7 +124,12 @@ fun AuthScreen(viewModel: PrivEatViewModel) {
                 Text(it, color = Color(0xFFE5484D), textAlign = TextAlign.Center, fontSize = 12.sp)
             }
             Spacer(Modifier.height(18.dp))
-            GradientButton(if (isSignUp) "Create Account" else "Sign In", onClick = { viewModel.signIn(email, password) })
+            GradientButton(
+                if (isSignUp) "Create Account" else "Sign In",
+                onClick = {
+                    if (isSignUp) viewModel.signUp(email, password) else viewModel.signIn(email, password)
+                }
+            )
             Spacer(Modifier.height(34.dp))
             Text(
                 if (isSignUp) "Already have an account? Sign In" else "Don't have an account? Sign Up",

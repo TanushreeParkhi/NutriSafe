@@ -20,11 +20,13 @@ android {
 
         val backendBaseUrl = providers.gradleProperty("PRIVEAT_BACKEND_BASE_URL").orElse("").get()
         val cloudAiEnabled = providers.gradleProperty("PRIVEAT_CLOUD_AI_ENABLED").orElse("false").get()
+        val backendAuthEnabled = providers.gradleProperty("PRIVEAT_BACKEND_AUTH_ENABLED").orElse("false").get()
         val geminiFlashModel = providers.gradleProperty("GEMINI_FLASH_MODEL").orElse("gemini-3-flash-preview").get()
         val geminiProModel = providers.gradleProperty("GEMINI_PRO_MODEL").orElse("gemini-3.1-pro-preview").get()
 
         buildConfigField("String", "PRIVEAT_BACKEND_BASE_URL", backendBaseUrl.asBuildConfigString())
         buildConfigField("Boolean", "CLOUD_AI_ENABLED", cloudAiEnabled.toBooleanStrictOrNull()?.toString() ?: "false")
+        buildConfigField("Boolean", "BACKEND_AUTH_ENABLED", backendAuthEnabled.toBooleanStrictOrNull()?.toString() ?: "false")
         buildConfigField("String", "GEMINI_FLASH_MODEL", geminiFlashModel.asBuildConfigString())
         buildConfigField("String", "GEMINI_PRO_MODEL", geminiProModel.asBuildConfigString())
     }
@@ -88,6 +90,9 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.sqlite:sqlite:2.4.0")
+    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
 
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")

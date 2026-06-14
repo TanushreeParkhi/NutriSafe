@@ -20,7 +20,8 @@ private val Context.privEatDataStore: DataStore<Preferences> by preferencesDataS
 
 data class AuthSession(
     val isLoggedIn: Boolean = false,
-    val email: String = ""
+    val email: String = "",
+    val authToken: String = ""
 )
 
 data class UserPreferences(
@@ -39,6 +40,7 @@ class UserPreferencesRepository(context: Context) {
     private object Keys {
         val loggedIn = booleanPreferencesKey("priveat_auth")
         val email = stringPreferencesKey("email")
+        val authToken = stringPreferencesKey("auth_token")
         val biometricLock = booleanPreferencesKey("biometric_lock")
         val sensitiveBlur = booleanPreferencesKey("sensitive_blur")
         val dietVault = stringPreferencesKey("diet_vault")
@@ -55,7 +57,8 @@ class UserPreferencesRepository(context: Context) {
     val session: Flow<AuthSession> = safeData.map { preferences ->
         AuthSession(
             isLoggedIn = preferences[Keys.loggedIn] ?: false,
-            email = preferences[Keys.email].orEmpty()
+            email = preferences[Keys.email].orEmpty(),
+            authToken = preferences[Keys.authToken].orEmpty()
         )
     }
 
@@ -71,10 +74,15 @@ class UserPreferencesRepository(context: Context) {
         )
     }
 
-    suspend fun setLoggedIn(email: String, loggedIn: Boolean) {
+    suspend fun setLoggedIn(email: String, loggedIn: Boolean, authToken: String = "") {
         dataStore.edit { preferences ->
             preferences[Keys.loggedIn] = loggedIn
             preferences[Keys.email] = email
+            if (authToken.isBlank()) {
+                preferences.remove(Keys.authToken)
+            } else {
+                preferences[Keys.authToken] = authToken
+            }
         }
     }
 

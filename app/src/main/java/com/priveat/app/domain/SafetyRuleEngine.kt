@@ -28,14 +28,33 @@ class SafetyRuleEngine {
                 else -> risk += 2
             }
         }
+        if (microbialRisk == "High") {
+            reasons += "Microbial growth risk is high because time, temperature, moisture, or raw/high-risk ingredients are unfavorable."
+        }
 
         if (!storage.refrigerated && storage.timeOutsideHours > 2f && facts.cooked) {
             risk += 15
             reasons += "Cooked food stayed outside refrigeration for more than 2 hours."
         }
+        if (!storage.refrigerated && storage.timeOutsideHours > 4f && facts.moistureLevel.equals("high", ignoreCase = true)) {
+            risk += 12
+            reasons += "High-moisture food held at room temperature for more than 4 hours is a spoilage concern."
+        }
+        if ((facts.containsDairy || facts.containsMeat || facts.raw) && !storage.refrigerated && storage.timeOutsideHours > 1f) {
+            risk += 16
+            reasons += "Dairy, meat, seafood, or raw foods require stricter cold-chain handling."
+        }
+        if (storage.storageTemperatureC in 6f..59f && storage.timeOutsideHours > 2f) {
+            risk += 10
+            reasons += "Storage temperature falls in the food-safety danger zone for extended holding."
+        }
         if (storage.sourceType.equals("street", ignoreCase = true)) {
             risk += 8
             reasons += "Street food adds uncertainty around handling and storage."
+        }
+        if (storage.sourceType.equals("packaged", ignoreCase = true) && facts.processedClassification.contains("processed", ignoreCase = true)) {
+            risk += 5
+            reasons += "Packaged processed food may include additives, sodium, or unknown post-opening storage risk."
         }
         if (facts.processedClassification.equals("ultra-processed", ignoreCase = true)) {
             risk += 12
@@ -129,10 +148,14 @@ class SafetyRuleEngine {
         var points = 0
         if (facts.moistureLevel.equals("high", ignoreCase = true)) points += 2
         if (facts.containsDairy || facts.containsMeat) points += 2
-        if (facts.cooked || facts.raw) points += 1
+        if (facts.raw) points += 3
+        if (facts.cooked) points += 1
         if (storage.timeOutsideHours > 2f) points += 2
         if (storage.timeOutsideHours > 4f) points += 2
+        if (storage.timeOutsideHours > 8f) points += 3
         if (!storage.refrigerated && storage.storageTemperatureC >= 25f) points += 2
+        if (!storage.refrigerated && storage.storageTemperatureC >= 32f) points += 2
+        if (storage.refrigerated && storage.storageTemperatureC > 8f) points += 1
         return when {
             points >= 7 -> "High"
             points >= 4 -> "Medium"
@@ -150,14 +173,15 @@ class SafetyRuleEngine {
 
     private fun diseaseWarnings(facts: FoodFacts, conditions: List<String>): List<String> {
         return conditions.mapNotNull { condition ->
-            when (condition.lowercase()) {
-                "diabetes" -> if (facts.carbsGrams > 80 || facts.sugarLevel == "high") "Diabetes: high carbohydrate or sugar load." else null
-                "bp", "blood pressure", "hypertension" -> if (facts.sodiumLevel == "high" || facts.processedClassification.contains("processed", true)) "BP: watch sodium and processed ingredients." else null
+            val normalized = condition.lowercase().trim()
+            when (normalized) {
+                "diabetes", "type 2 diabetes", "type 1 diabetes" -> if (facts.carbsGrams > 80 || facts.sugarLevel == "high") "Diabetes: high carbohydrate or sugar load." else null
+                "bp", "blood pressure", "high bp", "hypertension" -> if (facts.sodiumLevel == "high" || facts.processedClassification.contains("processed", true)) "BP: watch sodium and processed ingredients." else null
                 "pcos" -> if (facts.carbsGrams > 75 || facts.sugarLevel == "high") "PCOS: favor lower glycemic meals." else null
-                "cholesterol" -> if (facts.fatGrams > 25 || facts.fried) "Cholesterol: fried or high-fat elements detected." else null
-                "kidney", "kidney issues" -> if (facts.proteinGrams > 35 || facts.sodiumLevel == "high") "Kidney: check protein and sodium limits with clinician." else null
-                "acidity" -> if (facts.spicy || facts.fried) "Acidity: spicy or fried foods may trigger symptoms." else null
-                "obesity" -> if (facts.calories > 650 || facts.fried) "Obesity: calorie-dense meal; adjust portion or balance next meal." else null
+                "cholesterol", "high cholesterol", "ldl" -> if (facts.fatGrams > 25 || facts.fried) "Cholesterol: fried or high-fat elements detected." else null
+                "kidney", "kidney issues", "ckd", "renal" -> if (facts.proteinGrams > 35 || facts.sodiumLevel == "high") "Kidney: check protein and sodium limits with clinician." else null
+                "acidity", "gerd", "acid reflux" -> if (facts.spicy || facts.fried) "Acidity: spicy or fried foods may trigger symptoms." else null
+                "obesity", "weight loss" -> if (facts.calories > 650 || facts.fried) "Obesity: calorie-dense meal; adjust portion or balance next meal." else null
                 else -> null
             }
         }.distinct()
