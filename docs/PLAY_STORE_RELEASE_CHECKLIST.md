@@ -9,7 +9,7 @@
 
 ## Store Listing
 
-- App name: PrivEat.
+- App name: NutriSafe.
 - Short description focused on food freshness, spoilage risk, leftovers, allergens, and safety score.
 - Add phone screenshots for Auth, Dashboard, Meal Tracker, Safety Details, Insights, Privacy, and AI Planner.
 - Add feature graphic and adaptive icon.
@@ -32,7 +32,7 @@
 - Pick gallery image.
 - Import prescription image/PDF.
 - Add/delete allergy.
-- Generate local plan with cloud disabled.
-- Verify cloud fallback when backend is unavailable.
+- Generate a local plan with the Gemini key removed.
+- Verify local fallback when Gemini is unavailable or quota-limited.
 - Verify leftover reminder notification.
 - Verify offline mode.

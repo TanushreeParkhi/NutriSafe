@@ -1,6 +1,6 @@
 # Keep reflection-backed API DTOs stable for Retrofit/Gson.
--keep class com.priveat.app.data.remote.** { *; }
--keep class com.priveat.app.data.model.** { *; }
+-keep class com.nutrisafe.app.data.remote.** { *; }
+-keep class com.nutrisafe.app.data.model.** { *; }
 -keepattributes Signature
 -keepattributes RuntimeVisibleAnnotations
 

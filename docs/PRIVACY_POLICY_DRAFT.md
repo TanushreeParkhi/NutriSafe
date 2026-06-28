@@ -1,8 +1,8 @@
-# PrivEat Privacy Policy Draft
+# NutriSafe Privacy Policy Draft
 
 This draft must be reviewed before publication.
 
-PrivEat is designed as a local-first food safety app. Meals, allergies, health history, leftover timers, chat history, and preferences are stored on the user's device by default.
+NutriSafe is designed as a local-first food safety app. Meals, allergies, health history, leftover timers, chat history, and preferences are stored on the user's device by default.
 
 ## Data Stored On Device
 
@@ -12,19 +12,19 @@ PrivEat is designed as a local-first food safety app. Meals, allergies, health h
 - Leftover safety timers and notification settings.
 - Expert chat messages.
 
-## Optional Cloud Processing
+## Gemini Processing
 
-If cloud AI is enabled, selected prompts, images, or prescription documents may be sent to the PrivEat backend for Gemini processing. The Gemini API key is stored only on the backend. Users should be told before any cloud processing is enabled.
+When an AI feature is used, the selected prompt, meal image, or prescription document is sent directly to Google's Gemini API for processing. NutriSafe does not operate an account or data server. Users must be told before sending sensitive information to Gemini.
 
 ## Data Deletion
 
-The Delete Account flow deletes local PrivEat data from the device. If backend auth is enabled, it also requests backend account deletion.
+The Delete Account flow deletes local NutriSafe data from the device.
 
-## What PrivEat Does Not Do
+## What NutriSafe Does Not Do
 
-- PrivEat does not sell personal health data.
-- PrivEat does not store raw meal images unless the user chooses local-only image retention.
-- PrivEat does not provide diagnosis, treatment, or emergency medical advice.
+- NutriSafe does not sell personal health data.
+- NutriSafe does not store raw meal images unless the user chooses local-only image retention.
+- NutriSafe does not provide diagnosis, treatment, or emergency medical advice.
 
 ## Contact
 

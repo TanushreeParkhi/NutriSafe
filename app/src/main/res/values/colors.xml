@@ -1,6 +1,6 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="priveat_magenta">#C108FD</color>
-    <color name="priveat_orange">#FEB966</color>
-    <color name="priveat_ink">#071A2D</color>
+    <color name="nutrisafe_magenta">#C108FD</color>
+    <color name="nutrisafe_orange">#FEB966</color>
+    <color name="nutrisafe_ink">#071A2D</color>
 </resources>
