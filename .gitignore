@@ -22,12 +22,6 @@ local.properties
 *.hprof
 *.log
 
-# Python backend caches
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-
 # OS files
 .DS_Store
 Thumbs.db

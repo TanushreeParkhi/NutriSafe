@@ -1,6 +1,6 @@
 # Medical And Food Safety Disclaimer
 
-PrivEat provides informational food safety and nutrition suitability estimates. It is not a substitute for professional medical advice, diagnosis, or treatment.
+NutriSafe provides informational food safety and nutrition suitability estimates. It is not a substitute for professional medical advice, diagnosis, or treatment.
 
 Do not consume food that smells abnormal, appears moldy, has a slimy texture, has unknown storage history, or has remained in unsafe temperature conditions.
 
